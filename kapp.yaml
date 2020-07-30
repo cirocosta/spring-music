@@ -1,0 +1,29 @@
+apiVersion: kappctrl.k14s.io/v1alpha1
+kind: App
+metadata:
+  name: spring-music
+spec:
+  serviceAccountName: spring-music-deployer
+  fetch:
+  - git:
+      url: 'https://github.com/cirocosta/spring-music'
+      ref: 'origin/kontinue'
+      subPath: k8s
+  template: 
+  - ytt: 
+      ignoreUnknownComments: true
+      inline:
+        paths:
+          patch-image.yml: |
+            #@ load("@ytt:overlay", "overlay")
+            #@overlay/match by=overlay.subset({"kind":"Deployment","metadata":{"name":"spring-music"}})
+            ---
+            spec:
+              template:
+                spec: 
+                  containers:
+                    #@overlay/match by=overlay.subset({"name":"spring-music"})
+                    - name: spring-music
+                      image: "foo"
+  deploy:
+  - kapp: {}

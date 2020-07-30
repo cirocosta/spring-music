@@ -49,7 +49,7 @@ spec:
         apiVersion: kappctrl.k14s.io/v1alpha1
         kind: App
         metadata:
-          name: spring-music
+          generateName: spring-music-
         spec:
           serviceAccountName: spring-music-deployer
           fetch:
@@ -141,3 +141,22 @@ subjects:
 - kind: ServiceAccount
   name: spring-music-deployer
   namespace: default
+
+---
+
+apiVersion: experimental.kontinue.io/v1
+kind: CompletionRule
+metadata:
+  name: kapp-apps
+spec:
+  resource:
+    kind: App
+    apiVersion: kappctrl.k14s.io/v1alpha1
+  failed:
+    - condition: 
+        type: "ReconcileSucceeded"
+        status: "False"
+  succeeded:
+    - condition: 
+        type: "ReconcileSucceeded"
+        status: "True"
