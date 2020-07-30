@@ -33,7 +33,7 @@ spec:
             git:
               url: 'https://github.com/{{ .Vars.repo.url }}'
               revision: '{{ .Vars.repo.revision }}'
-    - name: deploy
+    - name: create-deployment
       vars:
         - name: repo
           sourceRefs:
@@ -46,36 +46,53 @@ spec:
           from: latestImage
           matches: [repo]
       template: |-
-        apiVersion: kappctrl.k14s.io/v1alpha1
-        kind: App
+        apiVersion: apps/v1
+        kind: Deployment
         metadata:
-          generateName: spring-music-
+          labels:
+            app.kubernetes.io/name: spring-music
+          name: spring-music
         spec:
-          serviceAccountName: spring-music-deployer
-          fetch:
-          - git:
-              url: 'https://github.com/{{ .Vars.repo.url }}'
-              ref: '{{ .Vars.repo.revision }}'
-              subPath: k8s
-          template: 
-          - ytt: 
-              ignoreUnknownComments: true
-              inline:
-                paths:
-                  patch-image.yml: |
-                    #@ load("@ytt:overlay", "overlay")
-                    #@overlay/match by=overlay.subset({"kind":"Deployment","metadata":{"name":"spring-music"}})
-                    ---
-                    spec:
-                      template:
-                        spec: 
-                          containers:
-                            #@overlay/match by=overlay.subset({"name":"spring-music"})
-                            - name: spring-music
-                              image: '{{ index .Inputs.latestImage 0 }}'
-          deploy:
-          - kapp: {}
-
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: spring-music
+          template:
+            metadata:
+              labels:
+                app.kubernetes.io/name: spring-music
+            spec:
+              containers:
+                - image: '{ index .Inputs.latestImage 0 }'
+                  name: spring-music
+                  imagePullPolicy: Always
+                  env:
+                    - name: JBP_CONFIG_SPRING_AUTO_RECONFIGURATION
+                      value: '{enabled: false}'
+                  ports:
+                    - containerPort: 8080
+    - name: create-service
+      vars:
+        - name: repo
+          sourceRefs:
+          - name: spring-music
+            kind: GitSource
+            apiVersion: experimental.kontinue.io/v1
+      template: |-
+        apiVersion: v1
+        kind: Service
+        metadata:
+          labels:
+            app.kubernetes.io/name: spring-music
+          name: spring-music
+        spec:
+          ports:
+            - port: 8080
+              protocol: TCP
+              targetPort: 8080
+          selector:
+            app.kubernetes.io/name: spring-music
+          type: ClusterIP
 ---
 
 apiVersion: experimental.kontinue.io/v1
@@ -147,16 +164,16 @@ subjects:
 apiVersion: experimental.kontinue.io/v1
 kind: CompletionRule
 metadata:
-  name: kapp-apps
+  name: deployment
 spec:
   resource:
-    kind: App
-    apiVersion: kappctrl.k14s.io/v1alpha1
+    kind: Deployment
+    apiVersion: apps/v1
   failed:
     - condition: 
-        type: "ReconcileSucceeded"
+        type: "Available"
         status: "False"
   succeeded:
     - condition: 
-        type: "ReconcileSucceeded"
+        type: "Available"
         status: "True"

@@ -1,0 +1,9 @@
+image:
+  repository: kontinue/spring-music
+  pullPolicy: IfNotPresent
+  tag: ""
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  port: 8080

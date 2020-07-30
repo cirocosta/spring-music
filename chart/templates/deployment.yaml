@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "..fullname" . }}
+  labels:
+    {{- include "..labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "..selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "..selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - image: {{ .Values.image }}
+          name: spring-music
+          imagePullPolicy: Always
+          env:
+            - name: JBP_CONFIG_SPRING_AUTO_RECONFIGURATION
+              value: '{enabled: false}'
+          ports:
+            - containerPort: 8080
