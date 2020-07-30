@@ -49,13 +49,14 @@ spec:
         apiVersion: kappctrl.k14s.io/v1alpha1
         kind: App
         metadata:
-          name: spring-music
+          generateName: spring-music-
         spec:
-          serviceAccountName: default
+          serviceAccountName: spring-music-deployer
           fetch:
           - git:
               url: 'https://github.com/{{ .Vars.repo.url }}'
               ref: '{{ .Vars.repo.revision }}'
+              subPath: k8s
           template:
           - ytt: {}
           deploy:
@@ -70,4 +71,60 @@ metadata:
   name: spring-music
 spec:
   repository: cirocosta/spring-music
-  branchFilter: master
+  branchFilter: kontinue
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: spring-music-cr
+rules:
+- apiGroups:
+  - build.pivotal.io
+  - kappctrl.k14s.io
+  resources:
+  - '*'
+  verbs:
+  - create
+  - update
+  - get
+  - list
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: spring-music-crb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: spring-music-cr
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: crds-system
+
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spring-music-deployer
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: spring-music-deployer-crb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: spring-music-deployer
+  namespace: default
