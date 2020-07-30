@@ -1,3 +1,7 @@
+#@ load("@ytt:data", "data")
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,14 +19,14 @@ spec:
         app.kubernetes.io/name: spring-music
     spec:
       containers:
-        - image: kontinue/spring-music
+        - image: #@ data.values.image
           name: spring-music
           imagePullPolicy: Always
           env:
-            - name: JBP_CONFIG_SPRING_AUTO_RECONFIGURATION: 
+            - name: JBP_CONFIG_SPRING_AUTO_RECONFIGURATION
               value: '{enabled: false}'
-        ports:
-          - containerPort: 8080
+          ports:
+            - containerPort: 8080
 
 ---
 
@@ -40,3 +44,4 @@ spec:
   selector:
     app.kubernetes.io/name: spring-music
   type: ClusterIP
+

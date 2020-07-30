@@ -57,8 +57,7 @@ spec:
               url: 'https://github.com/{{ .Vars.repo.url }}'
               ref: '{{ .Vars.repo.revision }}'
               subPath: k8s
-          template:
-          - ytt: {}
+          template: []
           deploy:
           - kapp: {}
 
