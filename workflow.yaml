@@ -1,0 +1,73 @@
+apiVersion: experimental.kontinue.io/v1
+kind: Workflow
+metadata:
+  name: spring-music
+spec:
+  steps:
+    - name: build
+      vars:
+        - name: repo
+          sourceRefs:
+          - name: spring-music
+            kind: GitSource
+            apiVersion: experimental.kontinue.io/v1
+        - name: builder
+          sourceRefs:
+          - name: builder
+            kind: RegistrySource
+            apiVersion: experimental.kontinue.io/v1
+      outputs:
+        latestImage:
+          from: "{.status.latestImage}"
+      template: |-
+        kind: Build
+        apiVersion: build.pivotal.io/v1alpha1
+        metadata:
+          generateName: build-spring-music-
+        spec:
+          tags: [ 'kontinue/spring-music' ]
+          serviceAccount: service-account
+          builder:
+            image: '{{ .Vars.builder.url }}@{{ .Vars.builder.revision }}'
+          source:
+            git:
+              url: 'https://github.com/{{ .Vars.repo.url }}'
+              revision: '{{ .Vars.repo.revision }}'
+    - name: deploy
+      vars:
+        - name: repo
+          sourceRefs:
+          - name: spring-music
+            kind: GitSource
+            apiVersion: experimental.kontinue.io/v1
+      inputs:
+        latestImage: 
+          step: build
+          from: latestImage
+          matches: [repo]
+      template: |-
+        apiVersion: kappctrl.k14s.io/v1alpha1
+        kind: App
+        metadata:
+          name: spring-music
+        spec:
+          serviceAccountName: default
+          fetch:
+          - git:
+              url: 'https://github.com/{{ .Vars.repo.url }}'
+              ref: '{{ .Vars.repo.revision }}'
+          template:
+          - ytt: {}
+          deploy:
+          - kapp: {}
+
+
+---
+
+apiVersion: experimental.kontinue.io/v1
+kind: GitSource
+metadata:
+  name: spring-music
+spec:
+  repository: cirocosta/spring-music
+  branchFilter: master
