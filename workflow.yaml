@@ -50,20 +50,20 @@ spec:
         kind: Deployment
         metadata:
           labels:
-            app.kubernetes.io/name: spring-music
-          name: spring-music
+            app.kubernetes.io/name: {{ .StepId }}
+          name: spring-music-{{ .StepId }}
         spec:
           replicas: 1
           selector:
             matchLabels:
-              app.kubernetes.io/name: spring-music
+              app.kubernetes.io/name: {{ .StepId }}
           template:
             metadata:
               labels:
-                app.kubernetes.io/name: spring-music
+                app.kubernetes.io/name: {{ .StepId }}
             spec:
               containers:
-                - image: '{ index .Inputs.latestImage 0 }'
+                - image: '{{ index .Inputs.latestImage 0 }}'
                   name: spring-music
                   imagePullPolicy: Always
                   env:
@@ -83,15 +83,15 @@ spec:
         kind: Service
         metadata:
           labels:
-            app.kubernetes.io/name: spring-music
-          name: spring-music
+            app.kubernetes.io/name: {{ .StepId }}
+          name: spring-music-{{ .StepId }}
         spec:
           ports:
             - port: 8080
               protocol: TCP
               targetPort: 8080
           selector:
-            app.kubernetes.io/name: spring-music
+            app.kubernetes.io/name: {{ .StepId }}
           type: ClusterIP
 ---
 
@@ -111,8 +111,7 @@ metadata:
   name: spring-music-cr
 rules:
 - apiGroups:
-  - build.pivotal.io
-  - kappctrl.k14s.io
+  - "*"
   resources:
   - '*'
   verbs:
@@ -169,11 +168,9 @@ spec:
   resource:
     kind: Deployment
     apiVersion: apps/v1
-  failed:
-    - condition: 
-        type: "Available"
-        status: "False"
+  timeout: 3m
   succeeded:
     - condition: 
         type: "Available"
         status: "True"
+
