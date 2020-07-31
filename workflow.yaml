@@ -19,21 +19,22 @@ spec:
       outputs:
         latestImage:
           from: "{.status.latestImage}"
-      template: |-
-        kind: Build
-        apiVersion: build.pivotal.io/v1alpha1
-        metadata:
-          generateName: build-spring-music-
-        spec:
-          tags: [ 'kontinue/spring-music' ]
-          serviceAccount: service-account
-          builder:
-            image: '{{ .Vars.builder.url }}@{{ .Vars.builder.revision }}'
-          source:
-            git:
-              url: 'https://github.com/{{ .Vars.repo.url }}'
-              revision: '{{ .Vars.repo.revision }}'
-    - name: create-deployment
+      templates:
+        - template: |-
+            kind: Build
+            apiVersion: build.pivotal.io/v1alpha1
+            metadata:
+              generateName: build-spring-music-
+            spec:
+              tags: [ 'kontinue/spring-music' ]
+              serviceAccount: service-account
+              builder:
+                image: '{{ .Vars.builder.url }}@{{ .Vars.builder.revision }}'
+              source:
+                git:
+                  url: 'https://github.com/{{ .Vars.repo.url }}'
+                  revision: '{{ .Vars.repo.revision }}'
+    - name: deploy
       vars:
         - name: repo
           sourceRefs:
@@ -45,54 +46,52 @@ spec:
           step: build
           from: latestImage
           matches: [repo]
-      template: |-
-        apiVersion: apps/v1
-        kind: Deployment
-        metadata:
-          labels:
-            app.kubernetes.io/name: {{ .RunId }}
-          name: spring-music-{{ .RunId }}
-        spec:
-          replicas: 1
-          selector:
-            matchLabels:
-              app.kubernetes.io/name: {{ .RunId }}
-          template:
+      outputs:
+        serviceName:
+          from: "{.metadata.name}"
+          index: 1
+      templates:
+        - template: |-
+            apiVersion: apps/v1
+            kind: Deployment
             metadata:
               labels:
                 app.kubernetes.io/name: {{ .RunId }}
+              name: spring-music-{{ .RunId }}
             spec:
-              containers:
-                - image: '{{ index .Inputs.latestImage 0 }}'
-                  name: spring-music
-                  imagePullPolicy: Always
-                  env:
-                    - name: JBP_CONFIG_SPRING_AUTO_RECONFIGURATION
-                      value: '{enabled: false}'
-                  ports:
-                    - containerPort: 8080
-    - name: create-service
-      vars:
-        - name: repo
-          sourceRefs:
-          - name: spring-music
-            kind: GitSource
-            apiVersion: experimental.kontinue.io/v1
-      template: |-
-        apiVersion: v1
-        kind: Service
-        metadata:
-          labels:
-            app.kubernetes.io/name: {{ .RunId }}
-          name: spring-music-{{ .RunId }}
-        spec:
-          ports:
-            - port: 8080
-              protocol: TCP
-              targetPort: 8080
-          selector:
-            app.kubernetes.io/name: {{ .RunId }}
-          type: ClusterIP
+              replicas: 1
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: {{ .RunId }}
+              template:
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: {{ .RunId }}
+                spec:
+                  containers:
+                    - image: '{{ index .Inputs.latestImage 0 }}'
+                      name: spring-music
+                      imagePullPolicy: Always
+                      env:
+                        - name: JBP_CONFIG_SPRING_AUTO_RECONFIGURATION
+                          value: '{enabled: false}'
+                      ports:
+                        - containerPort: 8080
+        - template: |-
+            apiVersion: v1
+            kind: Service
+            metadata:
+              labels:
+                app.kubernetes.io/name: {{ .RunId }}
+              name: spring-music-{{ .RunId }}
+            spec:
+              ports:
+                - port: 8080
+                  protocol: TCP
+                  targetPort: 8080
+              selector:
+                app.kubernetes.io/name: {{ .RunId }}
+              type: ClusterIP
     - name: run-test
       vars:
         - name: repo
@@ -100,21 +99,26 @@ spec:
           - name: spring-music
             kind: GitSource
             apiVersion: experimental.kontinue.io/v1
-      template: |-
-        apiVersion: tekton.dev/v1beta1
-        kind: TaskRun
-        metadata:
-          name: spring-music-{{ .RunId }}
-        spec:
-          taskSpec:
-            steps:
-            - name: run
-              image: busybox
-              script: |
-                set -o xtrace
-                set -o errexit
+      inputs:
+        serviceName: 
+          step: deploy
+          from: serviceName
+      templates:
+        - template: |-
+            apiVersion: tekton.dev/v1beta1
+            kind: TaskRun
+            metadata:
+              name: spring-music-{{ .RunId }}
+            spec:
+              taskSpec:
+                steps:
+                - name: run
+                  image: busybox
+                  script: |
+                    set -o xtrace
+                    set -o errexit
 
-                wget -O- http://spring-music-{{ .RunId }}:8080
+                    wget -O- http://{{ index .Inputs.serviceName 0 }}:8080
 
 ---
 
@@ -125,6 +129,7 @@ metadata:
 spec:
   repository: cirocosta/spring-music
   branchFilter: kontinue
+
 
 ---
 
@@ -196,4 +201,3 @@ spec:
     - condition: 
         type: "Available"
         status: "True"
-
