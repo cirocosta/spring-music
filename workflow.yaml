@@ -50,17 +50,17 @@ spec:
         kind: Deployment
         metadata:
           labels:
-            app.kubernetes.io/name: {{ .StepId }}
-          name: spring-music-{{ .StepId }}
+            app.kubernetes.io/name: {{ .RunId }}
+          name: spring-music-{{ .RunId }}
         spec:
           replicas: 1
           selector:
             matchLabels:
-              app.kubernetes.io/name: {{ .StepId }}
+              app.kubernetes.io/name: {{ .RunId }}
           template:
             metadata:
               labels:
-                app.kubernetes.io/name: {{ .StepId }}
+                app.kubernetes.io/name: {{ .RunId }}
             spec:
               containers:
                 - image: '{{ index .Inputs.latestImage 0 }}'
@@ -83,16 +83,39 @@ spec:
         kind: Service
         metadata:
           labels:
-            app.kubernetes.io/name: {{ .StepId }}
-          name: spring-music-{{ .StepId }}
+            app.kubernetes.io/name: {{ .RunId }}
+          name: spring-music-{{ .RunId }}
         spec:
           ports:
             - port: 8080
               protocol: TCP
               targetPort: 8080
           selector:
-            app.kubernetes.io/name: {{ .StepId }}
+            app.kubernetes.io/name: {{ .RunId }}
           type: ClusterIP
+    - name: run-test
+      vars:
+        - name: repo
+          sourceRefs:
+          - name: spring-music
+            kind: GitSource
+            apiVersion: experimental.kontinue.io/v1
+      template: |-
+        apiVersion: tekton.dev/v1beta1
+        kind: TaskRun
+        metadata:
+          name: spring-music-{{ .RunId }}
+        spec:
+          taskSpec:
+            steps:
+            - name: run
+              image: busybox
+              script: |
+                set -o xtrace
+                set -o errexit
+
+                wget -O- http://spring-music-{{ .RunId }}:8080
+
 ---
 
 apiVersion: experimental.kontinue.io/v1
